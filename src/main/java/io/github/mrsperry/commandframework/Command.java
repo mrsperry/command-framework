@@ -20,9 +20,6 @@ public @interface Command {
     /** A user friendly description of what this command does */
     String description() default "";
 
-    /** A detailed usage description of this command */
-    String help() default "";
-
     /** If this command may only be run by players */
     boolean playerOnly() default false;
 

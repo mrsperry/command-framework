@@ -1,5 +1,6 @@
 package io.github.mrsperry.commandframework;
 
+import com.google.common.collect.Sets;
 import org.bukkit.ChatColor;
 import org.bukkit.command.CommandSender;
 
@@ -8,10 +9,10 @@ import java.util.*;
 /** A command wrapper containing all relevant information a command would need to execute. See {@link Command} for detailed descriptions of each variable */
 final class WrappedCommand {
     private final String name;
+    private final Set<String> aliases;
     private final Set<String> identifiers;
     private final String usage;
     private final String description;
-    private final String help;
     private final boolean playerOnly;
     private final int minArgs;
     private final int maxArgs;
@@ -23,10 +24,11 @@ final class WrappedCommand {
 
     protected WrappedCommand(final Command command) {
         this.name = command.name();
+        this.aliases = Sets.newHashSet(command.aliases());
 
         this.identifiers = new HashSet<>();
         this.identifiers.add(this.name);
-        this.identifiers.addAll(Arrays.asList(command.aliases()));
+        this.identifiers.addAll(this.aliases);
 
         final String usage = command.usage();
         if (usage.equals("")) {
@@ -40,13 +42,6 @@ final class WrappedCommand {
             this.description = "No description provided for '" + this.name + "'";
         } else {
             this.description = description;
-        }
-
-        final String help = command.help();
-        if (help.equals("")) {
-            this.help = "No detailed help provided for '" + this.name + "'";
-        } else {
-            this.help = help;
         }
 
         this.playerOnly = command.playerOnly();
@@ -118,6 +113,10 @@ final class WrappedCommand {
         return this.name;
     }
 
+    protected final Set<String> getAliases() {
+        return this.aliases;
+    }
+
     protected final Set<String> getIdentifiers() {
         return this.identifiers;
     }
@@ -128,10 +127,6 @@ final class WrappedCommand {
 
     protected final String getDescription() {
         return this.description;
-    }
-
-    protected final String getHelp() {
-        return this.help;
     }
 
     protected final boolean isPlayerOnly() {

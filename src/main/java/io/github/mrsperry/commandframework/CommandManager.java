@@ -84,7 +84,6 @@ public final class CommandManager {
             pluginCommand.setAccessible(true);
 
             final CommandMap commandMap = (CommandMap) field.get(server);
-            final String pluginName = this.plugin.getName();
 
             // Add each command to the command map
             for (final WrappedCommand wrapped : this.commands.keySet()) {
@@ -102,10 +101,10 @@ public final class CommandManager {
                 }
 
                 // Register each identifier (name and all aliases) for this command
-                for (final String id : wrapped.getIdentifiers()) {
-                    final PluginCommand command = pluginCommand.newInstance(id, this.plugin);
-                    commandMap.register(pluginName, command);
-                }
+                commandMap.register(this.plugin.getName().toLowerCase(), pluginCommand.newInstance(wrapped.getName(), this.plugin)
+                        .setUsage(wrapped.getUsage())
+                        .setDescription(wrapped.getDescription())
+                        .setAliases(new ArrayList<>(wrapped.getAliases())));
             }
         } catch (final Exception ex) {
             this.plugin.getLogger().severe("An error occurred while registering commands!");
