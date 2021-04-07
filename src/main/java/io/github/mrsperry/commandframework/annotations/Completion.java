@@ -9,5 +9,5 @@ import java.lang.annotation.Target;
 @Retention(RetentionPolicy.RUNTIME)
 public @interface Completion {
     /** The name of the command the completion method is for */
-    String name();
+    String value();
 }

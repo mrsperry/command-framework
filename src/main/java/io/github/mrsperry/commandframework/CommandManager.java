@@ -121,9 +121,9 @@ public final class CommandManager {
 
         if (isStatic) {
             name = method.getAnnotation(Command.class).name();
-            completions = method.getAnnotation(StaticCompletion.class).completions();
+            completions = method.getAnnotation(StaticCompletion.class).value();
         } else {
-            name = method.getAnnotation(Completion.class).name();
+            name = method.getAnnotation(Completion.class).value();
             completions = new String[0];
 
             // Ensure that the dynamic completion method can be run

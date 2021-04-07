@@ -13,5 +13,5 @@ public @interface StaticCompletion {
      *
      * To add multiple completions for a single index, separate them with a pipe (|) ex: { "one", "two|three" }
      */
-    String[] completions();
+    String[] value();
 }

@@ -49,7 +49,7 @@ public class Commands {
         Bukkit.getLogger().info("Circle command");
     }
 
-    @Completion(name = "circle")
+    @Completion("circle")
     public List<String> circleCompletion(CompletionContext context) {
         return Lists.newArrayList("always");
     }
@@ -67,7 +67,7 @@ When using static completion, multiple completions for a single argument index a
 ```java
 public class Commands {
     @Command(name = "circle")
-    @StaticCompletion(completions = { "one", "two|three" })
+    @StaticCompletion({ "one", "two|three" })
     public void circle(CommandContext context) {
         Bukkit.getLogger().info("Circle command");
     }
