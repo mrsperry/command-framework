@@ -1,4 +1,4 @@
-package io.github.mrsperry.commandframework;
+package io.github.mrsperry.commandframework.annotations;
 
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;

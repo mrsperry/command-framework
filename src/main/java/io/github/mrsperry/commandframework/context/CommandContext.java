@@ -1,4 +1,4 @@
-package io.github.mrsperry.commandframework;
+package io.github.mrsperry.commandframework.context;
 
 import org.bukkit.command.CommandSender;
 

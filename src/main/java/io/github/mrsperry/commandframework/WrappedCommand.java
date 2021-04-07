@@ -1,9 +1,11 @@
 package io.github.mrsperry.commandframework;
 
 import com.google.common.collect.Sets;
+import io.github.mrsperry.commandframework.annotations.Command;
 import org.bukkit.ChatColor;
 import org.bukkit.command.CommandSender;
 
+import java.lang.reflect.Method;
 import java.util.*;
 
 /** A command wrapper containing all relevant information a command would need to execute. See {@link Command} for detailed descriptions of each variable */
@@ -18,6 +20,9 @@ final class WrappedCommand {
     private final int maxArgs;
     private final Map<String, Boolean> flags;
     private final Set<String> permissions;
+
+    private Map<Integer, List<String>> completions;
+    private Method completionMethod;
 
     /** If context should be sent when this command is executed */
     private boolean sendContext;
@@ -58,6 +63,9 @@ final class WrappedCommand {
         }
 
         this.permissions = new HashSet<>(Arrays.asList(command.permissions()));
+
+        this.completions = new HashMap<>();
+        this.completionMethod = null;
 
         this.sendContext = false;
     }
@@ -151,6 +159,22 @@ final class WrappedCommand {
 
     protected final boolean hasPermission(final String permission) {
         return this.permissions.isEmpty() || this.permissions.contains(permission);
+    }
+
+    protected final Map<Integer, List<String>> getStaticCompletions() {
+        return this.completions;
+    }
+
+    protected final void setStaticCompletions(final Map<Integer, List<String>> completions) {
+        this.completions = completions;
+    }
+
+    protected final Method getCompletionMethod() {
+        return this.completionMethod;
+    }
+
+    protected final void setCompletionMethod(final Method method) {
+        this.completionMethod = method;
     }
 
     protected final void sendContext() {

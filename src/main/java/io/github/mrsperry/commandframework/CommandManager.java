@@ -1,11 +1,18 @@
 package io.github.mrsperry.commandframework;
 
+import com.google.common.collect.Lists;
+import io.github.mrsperry.commandframework.annotations.Command;
+import io.github.mrsperry.commandframework.annotations.Completion;
+import io.github.mrsperry.commandframework.annotations.StaticCompletion;
+import io.github.mrsperry.commandframework.context.CommandContext;
+import io.github.mrsperry.commandframework.context.CompletionContext;
 import org.bukkit.Server;
 import org.bukkit.command.*;
 import org.bukkit.entity.Player;
 import org.bukkit.permissions.PermissionAttachmentInfo;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.plugin.java.JavaPlugin;
+import org.bukkit.util.StringUtil;
 
 import java.lang.reflect.*;
 import java.util.*;
@@ -33,42 +40,141 @@ public final class CommandManager {
      * @return The instance of the command manager, allowing for chaining register calls
      */
     public final CommandManager register(final Class<?> clazz) {
-        for (final Method method : clazz.getMethods()) {
+        final Method[] methods = clazz.getMethods();
+
+        for (final Method method : methods) {
             // Skip methods not marked with the command annotation
-            if (!method.isAnnotationPresent(Command.class)) {
-                continue;
+            if (method.isAnnotationPresent(Command.class)) {
+                this.registerExecutor(method);
             }
+        }
 
-            // Create the new command
-            final WrappedCommand command = new WrappedCommand(method.getAnnotation(Command.class));
-            final Set<String> identifiers = command.getIdentifiers();
-
-            // Check for duplicate identifiers in this command
-            boolean register = true;
-            for (final WrappedCommand current : this.commands.keySet()) {
-                String duplicateID = null;
-
-                for (final String id : current.getIdentifiers()) {
-                    if (identifiers.contains(id)) {
-                        duplicateID = id;
-                        register = false;
-                        break;
-                    }
-                }
-
-                if (duplicateID != null) {
-                    this.plugin.getLogger().severe("A duplicate command identifier was found and will not be registered: " + duplicateID);
-                    break;
-                }
-            }
-
-            // Register the command
-            if (register) {
-                this.commands.put(command, method);
+        // Run completion setup after creating all wrapped commands
+        for (final Method method : methods) {
+            // Skip methods not marked with the completion annotations
+            if (method.isAnnotationPresent(Completion.class)) {
+                this.registerCompletion(method, false);
+            } else if (method.isAnnotationPresent(StaticCompletion.class)) {
+                this.registerCompletion(method, true);
             }
         }
 
         return this;
+    }
+
+    /**
+     * Registers a command executor method
+     * @param method The method to register
+     */
+    private void registerExecutor(final Method method) {
+        // Create the new command
+        final WrappedCommand command = new WrappedCommand(method.getAnnotation(Command.class));
+        final Set<String> identifiers = command.getIdentifiers();
+
+        // Check if command context should be sent when the command is executed
+        final Type[] params = method.getGenericParameterTypes();
+        if (params.length == 1) {
+            if (params[0].equals(CommandContext.class)) {
+                command.sendContext();
+            } else {
+                this.plugin.getLogger().severe("The only argument in command methods must be of type CommandContext: ");
+                return;
+            }
+        } else if (params.length != 0) {
+            this.plugin.getLogger().severe("Command methods may only contain zero or one arguments");
+            return;
+        }
+
+        // Check for duplicate identifiers in this command
+        boolean register = true;
+        for (final WrappedCommand current : this.commands.keySet()) {
+            String duplicateID = null;
+
+            for (final String id : current.getIdentifiers()) {
+                if (identifiers.contains(id)) {
+                    duplicateID = id;
+                    register = false;
+                    break;
+                }
+            }
+
+            if (duplicateID != null) {
+                this.plugin.getLogger().severe("A duplicate command identifier was found and will not be registered: " + duplicateID);
+                break;
+            }
+        }
+
+        // Register the command
+        if (register) {
+            this.commands.put(command, method);
+        }
+    }
+
+    /**
+     * Registers a command tab completion method
+     * @param method The method to register
+     * @param isStatic If the completion is static or dynamic
+     */
+    private void registerCompletion(final Method method, final boolean isStatic) {
+        final String name;
+        final String[] completions;
+
+        if (isStatic) {
+            name = method.getAnnotation(Command.class).name();
+            completions = method.getAnnotation(StaticCompletion.class).completions();
+        } else {
+            name = method.getAnnotation(Completion.class).name();
+            completions = new String[0];
+
+            // Ensure that the dynamic completion method can be run
+            try {
+                final ParameterizedType type = (ParameterizedType) method.getGenericReturnType();
+                if (!type.getRawType().equals(List.class)) {
+                    throw new Exception();
+                }
+
+                if (!type.getActualTypeArguments()[0].equals(String.class)) {
+                    throw new Exception();
+                }
+            } catch (final Exception ex) {
+                this.plugin.getLogger().severe("Completion methods must return a List<String>: " + this.formatMethodLocation(method));
+                return;
+            }
+
+            final Type[] params = method.getGenericParameterTypes();
+            if (params.length != 1 || !params[0].equals(CompletionContext.class)) {
+                this.plugin.getLogger().severe("Completion methods must only contain a single argument of type CompletionContext: " + this.formatMethodLocation(method));
+                return;
+            }
+        }
+
+        // Get the command this completion applies to
+        WrappedCommand command = null;
+        for (final WrappedCommand current : this.commands.keySet()) {
+            if (current.identify(name)) {
+                command = current;
+                break;
+            }
+        }
+
+        if (command == null) {
+            this.plugin.getLogger().severe("Could not find command for tab completion (is the method private?): " + this.formatMethodLocation(method));
+            return;
+        }
+
+        // Set the completions
+        if (isStatic) {
+            final Map<Integer, List<String>> completionMap = new HashMap<>();
+            // Split static completions on the pipe symbol, allowing multiple completions per index
+            // ex: { "one", "two|three" } -> { 1: "one", 2: { "two", "three" } }
+            for (int index = 0; index < completions.length; index++) {
+                completionMap.put(index, Lists.newArrayList(completions[index].split("\\|")));
+            }
+
+            command.setStaticCompletions(completionMap);
+        } else {
+            command.setCompletionMethod(method);
+        }
     }
 
     /** Puts all registered commands into the Bukkit command map so that they can be accessed in-game */
@@ -87,19 +193,6 @@ public final class CommandManager {
 
             // Add each command to the command map
             for (final WrappedCommand wrapped : this.commands.keySet()) {
-                final Type[] params = this.commands.get(wrapped).getGenericParameterTypes();
-
-                // Check if command context should be sent when the command is executed
-                if (params.length == 1) {
-                    if (params[0].equals(CommandContext.class)) {
-                        wrapped.sendContext();
-                    } else {
-                        throw new IllegalArgumentException("The only argument in command methods must be of type CommandContext");
-                    }
-                } else if (params.length != 0) {
-                    throw new IllegalArgumentException("Command methods may only contain zero or one arguments");
-                }
-
                 // Register each identifier (name and all aliases) for this command
                 commandMap.register(this.plugin.getName().toLowerCase(), pluginCommand.newInstance(wrapped.getName(), this.plugin)
                         .setUsage(wrapped.getUsage())
@@ -216,15 +309,70 @@ public final class CommandManager {
                     method.invoke(this.plugin);
                 }
             } catch (final IllegalAccessException ex) {
-                this.plugin.getLogger().severe("Could not access method to invoke command: " + cmd);
+                this.plugin.getLogger().severe("Could not access method to invoke command: " + this.formatMethodLocation(method));
                 ex.printStackTrace();
             } catch (final IllegalArgumentException ex) {
-                this.plugin.getLogger().severe("Illegal argument passed to command method: " + cmd);
+                this.plugin.getLogger().severe("Illegal argument passed to command method: " + this.formatMethodLocation(method));
                 ex.printStackTrace();
             } catch (final InvocationTargetException ex) {
-                this.plugin.getLogger().severe("Could not invoke method for command: " + cmd);
+                this.plugin.getLogger().severe("Could not invoke method for command: " + this.formatMethodLocation(method));
                 ex.printStackTrace();
             }
         }
+    }
+
+    /**
+     * Attempts to tab complete a registered command
+     * @param sender The command sender
+     * @param command The command being typed
+     * @param args The command's arguments
+     * @return A list of completions to display
+     */
+    @SuppressWarnings("unchecked")
+    public final List<String> completion(final CommandSender sender, final String command, final String[] args) {
+        for (final WrappedCommand cmd : this.commands.keySet()) {
+            if (!cmd.identify(command.toLowerCase())) {
+                continue;
+            }
+
+            // Get the initial static completions
+            final List<String> completions = new ArrayList<>();
+            final int index = args.length - 1;
+            StringUtil.copyPartialMatches(args[index], cmd.getStaticCompletions().getOrDefault(index, new ArrayList<>()), completions);
+
+            // Check if dynamic completions should be run
+            final Method method = cmd.getCompletionMethod();
+            if (method == null) {
+                return completions;
+            }
+
+            // Run the dynamic completion
+            try {
+                method.setAccessible(true);
+                completions.addAll((List<String>) method.invoke(this.plugin, new CompletionContext(sender, args)));
+            } catch (final IllegalAccessException ex) {
+                this.plugin.getLogger().severe("Could not access method to invoke command: " + this.formatMethodLocation(method));
+                ex.printStackTrace();
+            } catch (final IllegalArgumentException ex) {
+                this.plugin.getLogger().severe("Illegal argument passed to command method: " + this.formatMethodLocation(method));
+                ex.printStackTrace();
+            } catch (final InvocationTargetException ex) {
+                this.plugin.getLogger().severe("Could not invoke method for command: " + this.formatMethodLocation(method));
+                ex.printStackTrace();
+            }
+
+            return completions;
+        }
+
+        return new ArrayList<>();
+    }
+
+    /**
+     * Formats a method signature
+     * @param method The method to format
+     * @return The method signature in the style: "[method name]() in [class name]"
+     */
+    private String formatMethodLocation(final Method method) {
+        return method.getName() + "() in " + method.getDeclaringClass().getSimpleName();
     }
 }
