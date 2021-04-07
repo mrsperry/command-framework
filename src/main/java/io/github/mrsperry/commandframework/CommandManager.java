@@ -6,6 +6,7 @@ import io.github.mrsperry.commandframework.annotations.Completion;
 import io.github.mrsperry.commandframework.annotations.StaticCompletion;
 import io.github.mrsperry.commandframework.context.CommandContext;
 import io.github.mrsperry.commandframework.context.CompletionContext;
+import io.github.mrsperry.commandframework.exceptions.*;
 import org.bukkit.Server;
 import org.bukkit.command.*;
 import org.bukkit.entity.Player;
@@ -211,7 +212,7 @@ public final class CommandManager {
      * @param command The name of the command
      * @param originalArgs The arguments of the command
      */
-    public final void execute(final CommandSender sender, final String command, final String[] originalArgs) {
+    public final void execute(final CommandSender sender, final String command, final String[] originalArgs) throws SenderException, PermissionException, FlagException, TooFewArgumentsException, TooManyArgumentsException, IllegalArgumentException {
         for (final WrappedCommand cmd : this.commands.keySet()) {
             // Only execute if the command name is an identifier of the current wrapped command
             if (!cmd.identify(command.toLowerCase())) {
@@ -220,8 +221,7 @@ public final class CommandManager {
 
             // Check if the sender must be a player
             if (cmd.isPlayerOnly() && !(sender instanceof Player)) {
-                cmd.playerOnly(sender);
-                return;
+                throw new SenderException("You must be a player to use this command");
             }
 
             // Check if the sender has permission
@@ -241,8 +241,7 @@ public final class CommandManager {
             }
 
             if (!hasPermission) {
-                cmd.noPermission(sender);
-                return;
+                throw new PermissionException();
             }
 
             // Split flags from actual arguments
@@ -261,15 +260,13 @@ public final class CommandManager {
                 // Check if this flag is supported by the command
                 final String strippedArg = arg.substring(1);
                 if (!cmd.supportsFlag(strippedArg)) {
-                    cmd.noSuchFlag(sender, arg);
-                    return;
+                    throw new FlagException("Flag '" + arg + "' is not supported on this command");
                 }
 
                 // Check if this flag requires a value trailing it
                 if (cmd.flagRequiresValue(strippedArg)) {
                     if (originalArgs.length <= index + 1) {
-                        cmd.flagRequiresValue(sender, arg);
-                        return;
+                        throw new FlagException("Flag '" + arg + "' requires a value proceeding it");
                     }
 
                     flags.put(strippedArg, originalArgs[index + 1]);
@@ -287,15 +284,13 @@ public final class CommandManager {
 
             // Check if there are enough arguments
             if (cmd.getMinArgs() > args.length) {
-                cmd.tooFewArguments(sender);
-                return;
+                throw new TooFewArgumentsException();
             }
 
             // Check if there are too many arguments
             final int maxArgs = cmd.getMaxArgs();
             if (maxArgs != -1 && maxArgs < args.length) {
-                cmd.tooManyArguments(sender);
-                return;
+                throw new TooManyArgumentsException();
             }
 
             // Try to execute the method assigned to this command

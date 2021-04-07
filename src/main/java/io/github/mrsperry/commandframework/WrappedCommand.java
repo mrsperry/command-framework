@@ -2,8 +2,6 @@ package io.github.mrsperry.commandframework;
 
 import com.google.common.collect.Sets;
 import io.github.mrsperry.commandframework.annotations.Command;
-import org.bukkit.ChatColor;
-import org.bukkit.command.CommandSender;
 
 import java.lang.reflect.Method;
 import java.util.*;
@@ -68,45 +66,6 @@ final class WrappedCommand {
         this.completionMethod = null;
 
         this.sendContext = false;
-    }
-
-    /** Used when a sender other than a player runs a player-only command */
-    protected final void playerOnly(final CommandSender sender) {
-        sender.sendMessage(ChatColor.RED + "You must be a player to use this command.");
-    }
-
-    /** Used when a sender does not have permission to run this command */
-    protected final void noPermission(final CommandSender sender) {
-        sender.sendMessage(ChatColor.RED + "You do not have permission to use this command.");
-    }
-
-    /** Used when there are too few arguments to run this command */
-    protected final void tooFewArguments(final CommandSender sender) {
-        sender.sendMessage(ChatColor.RED + "Too few arguments.");
-        this.usage(sender);
-    }
-
-    /** Used when there are too many arguments to run this command */
-    protected final void tooManyArguments(final CommandSender sender) {
-        sender.sendMessage(ChatColor.RED + "Too many arguments.");
-        this.usage(sender);
-    }
-
-    /** Used when a flag is present that is not supported by this command */
-    protected final void noSuchFlag(final CommandSender sender, final String flag) {
-        sender.sendMessage(ChatColor.RED + "Flag '" + flag + "' is not supported on this command.");
-        this.usage(sender);
-    }
-
-    /** Used when a flag is supported by this command but requires a value after it and none was found */
-    protected final void flagRequiresValue(final CommandSender sender, final String flag) {
-        sender.sendMessage(ChatColor.RED + "Flag '" + flag + "' requires a value after it.");
-        this.usage(sender);
-    }
-
-    /** Used when the usage of this command should be displayed */
-    protected final void usage(final CommandSender sender) {
-        sender.sendMessage(ChatColor.RED + "Usage: " + this.getUsage());
     }
 
     /**
