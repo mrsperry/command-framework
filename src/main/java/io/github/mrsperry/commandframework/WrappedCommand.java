@@ -33,12 +33,7 @@ final class WrappedCommand {
         this.identifiers.add(this.name);
         this.identifiers.addAll(this.aliases);
 
-        final String usage = command.usage();
-        if (usage.equals("")) {
-            this.usage = "No usage provided for '" + this.name + "'";
-        } else {
-            this.usage = "/" + this.name + " " + command.usage();
-        }
+        this.usage = "/" + this.name + " " + command.usage();
 
         final String description = command.description();
         if (description.equals("")) {
