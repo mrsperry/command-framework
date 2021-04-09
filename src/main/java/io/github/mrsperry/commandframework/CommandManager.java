@@ -15,8 +15,11 @@ import org.bukkit.plugin.Plugin;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.util.StringUtil;
 
+import java.io.*;
 import java.lang.reflect.*;
 import java.util.*;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipInputStream;
 
 public final class CommandManager {
     /** A map of executable commands and their respective methods */
@@ -34,13 +37,115 @@ public final class CommandManager {
     }
 
     /**
+     * Registers all classes in the plugin's package
+     *
+     * For recursive registering use {@code registerPackage(File jar, String packageName, boolean recursive}
+     * @param jar The file of the plugin
+     * @return The instance of the command manager, allowing for chaining register calls
+     */
+    public final CommandManager registerPackage(final File jar) {
+        return this.registerPackage(jar, null);
+    }
+
+    /**
+     * Registers all classes in the given sub-package
+     *
+     * This will not register any classes in the main package and it is not recursive
+     * @param jar The file of the plugin
+     * @param packageName The name of the sub-package (period separated, ex: "your.sub.package")
+     * @return The instance of the command manager, allowing for chaining register calls
+     */
+    public final CommandManager registerPackage(final File jar, final String packageName) {
+        return this.registerPackage(jar, packageName, false);
+    }
+
+    /**
+     * Registers all classes in the given sub-package
+     *
+     * This will not register any classes in the main package but will recursively register all sub-packages
+     * @param jar The file of the plugin
+     * @param packageName The name of the sub-package (period separated, ex: "your.sub.package")
+     * @param recursive If sub-packages of the given sub-package should be registered
+     * @return The instance of the command manager, allowing for chaining register calls
+     */
+    public final CommandManager registerPackage(final File jar, String packageName, final boolean recursive) {
+        // Set the main plugin package as the package name
+        final String packageCopy = packageName;
+        packageName = this.plugin.getClass().getPackageName();
+
+        // Add a subpackage if available
+        if (packageCopy != null) {
+            packageName += "." + packageCopy;
+        }
+        packageName = packageName.replace(".", "/");
+
+        final List<String> classNames = new ArrayList<>();
+        try {
+            // Get a stream of all files in the plugin jar
+            final InputStream input = new FileInputStream(jar.getAbsolutePath());
+            final ZipInputStream zip = new ZipInputStream(input);
+
+            for (ZipEntry entry = zip.getNextEntry(); entry != null; entry = zip.getNextEntry()) {
+                if (entry.isDirectory()) {
+                    continue;
+                }
+
+                String name = entry.getName();
+                if (!name.endsWith(".class")) {
+                    continue;
+                }
+                name = name.substring(0, name.length() - ".class".length());
+
+                // Get the package name of the current class
+                final String[] location = name.split("/");
+                final StringBuilder currentPackage = new StringBuilder();
+                for (int index = 0; index < location.length - 1; index++) {
+                    currentPackage.append(location[index]).append("/");
+                }
+                // Remove trailing slash
+                currentPackage.deleteCharAt(currentPackage.length() - 1);
+
+                // Check if this class is in the given package or a sub-package if recursive
+                if (recursive) {
+                    if (!currentPackage.toString().startsWith(packageName)) {
+                        continue;
+                    }
+                } else {
+                    if (!packageName.equals(currentPackage.toString())) {
+                        continue;
+                    }
+                }
+
+                classNames.add(name.replace("/", "."));
+            }
+        } catch (final Exception ex) {
+            this.plugin.getLogger().severe("Could not read package entries for: " + packageName.replace("/", "."));
+            ex.printStackTrace();
+            return this;
+        }
+
+        // Register each class
+        for (final String name : classNames) {
+            try {
+                this.registerClass(Class.forName(name));
+            } catch (final Exception ex) {
+                this.plugin.getLogger().severe("Could not get class to register command: " + name);
+                ex.printStackTrace();
+                return this;
+            }
+        }
+
+        return this;
+    }
+
+    /**
      * Registers all methods in a class that use the {@link Command} annotation
      *
      * If a command method has a non-unique identifier (name and aliases) a warning will be logged and the command will not be registered
      * @param clazz The class who's methods will be registered
      * @return The instance of the command manager, allowing for chaining register calls
      */
-    public final CommandManager register(final Class<?> clazz) {
+    public final CommandManager registerClass(final Class<?> clazz) {
         final Method[] methods = clazz.getMethods();
 
         for (final Method method : methods) {
