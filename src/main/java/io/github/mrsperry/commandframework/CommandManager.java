@@ -403,10 +403,12 @@ public final class CommandManager {
             try {
                 method.setAccessible(true);
 
+                // Get the declaring class of this method and create a new instance of it
+                final Object base = method.getDeclaringClass().getDeclaredConstructor().newInstance();
                 if (cmd.shouldSendContext()) {
-                    method.invoke(this.plugin, new CommandContext(sender, args, flags));
+                    method.invoke(base, new CommandContext(sender, args, flags));
                 } else {
-                    method.invoke(this.plugin);
+                    method.invoke(base);
                 }
             } catch (final IllegalAccessException ex) {
                 this.plugin.getLogger().severe("Could not access method to invoke command: " + this.formatMethodLocation(method));
@@ -416,6 +418,9 @@ public final class CommandManager {
                 ex.printStackTrace();
             } catch (final InvocationTargetException ex) {
                 this.plugin.getLogger().severe("Could not invoke method for command: " + this.formatMethodLocation(method));
+                ex.printStackTrace();
+            } catch (final NoSuchMethodException | InstantiationException ex) {
+                this.plugin.getLogger().severe("Could not instantiate command class while executing: " + this.formatMethodLocation(method));
                 ex.printStackTrace();
             }
         }
@@ -449,7 +454,10 @@ public final class CommandManager {
             // Run the dynamic completion
             try {
                 method.setAccessible(true);
-                completions.addAll((List<String>) method.invoke(this.plugin, new CompletionContext(sender, args)));
+
+                // Get the declaring class of this method and create a new instance of it
+                final Object base = method.getDeclaringClass().getDeclaredConstructor().newInstance();
+                completions.addAll((List<String>) method.invoke(base, new CompletionContext(sender, args)));
             } catch (final IllegalAccessException ex) {
                 this.plugin.getLogger().severe("Could not access method to invoke command: " + this.formatMethodLocation(method));
                 ex.printStackTrace();
@@ -458,6 +466,9 @@ public final class CommandManager {
                 ex.printStackTrace();
             } catch (final InvocationTargetException ex) {
                 this.plugin.getLogger().severe("Could not invoke method for command: " + this.formatMethodLocation(method));
+                ex.printStackTrace();
+            } catch (final NoSuchMethodException | InstantiationException ex) {
+                this.plugin.getLogger().severe("Could not instantiate command class while tab completing: " + this.formatMethodLocation(method));
                 ex.printStackTrace();
             }
 
